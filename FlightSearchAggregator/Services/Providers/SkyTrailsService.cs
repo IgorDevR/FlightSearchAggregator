@@ -87,8 +87,8 @@ public class SkyTrailsService : ISkyTrailsService, IBookingService
 
     public async Task<BookingDetailDto?> GetBookingDetail(Guid id)
     {
-        var flyQuestBookingDetailDto =
+        var skyTrailsBookingDetailDto =
             await _httpService.ExecuteGetRequest<SkyTrailsBookingDetailDto>(_clineName, $"flights/book/{id}");
-        return _mapper.Map<BookingDetailDto>(flyQuestBookingDetailDto);
+        return _mapper.Map<BookingDetailDto>(skyTrailsBookingDetailDto);
     }
 }
