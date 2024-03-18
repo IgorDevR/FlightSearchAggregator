@@ -15,7 +15,7 @@ public class FlightService
     private List<Flight>? _cachedFlights = new List<Flight>();
     private readonly string _cacheKey = "AggregatedFlights";
 
-    public FlightService(IFlyQuestService flyQuestService, IMemoryCache cache, ISkyTrailsService skyTrailsService,
+    public FlightService(IFlyQuestService flyQuestService, ISkyTrailsService skyTrailsService, IMemoryCache cache,
         ILogger<FlightService> logger)
     {
         _flyQuestService = flyQuestService;
@@ -26,8 +26,7 @@ public class FlightService
 
     public async Task<List<Flight>> GetAggregatedFlights(FlightSortParams sortParams)
     {
-        var cacheKey = "AggregatedFlights";
-        if (!_cache.TryGetValue(cacheKey, out _cachedFlights))
+        if (!_cache.TryGetValue(_cacheKey, out _cachedFlights) || !_cachedFlights!.Any())
         {
             var tasks = new List<Task<List<Flight>>>
             {
@@ -42,13 +41,13 @@ public class FlightService
             var cacheEntryOptions = new MemoryCacheEntryOptions()
                 .SetAbsoluteExpiration(TimeSpan.FromMinutes(1));
 
-            _cache.Set(cacheKey, sortedFlights, cacheEntryOptions);
+            _cache.Set(_cacheKey, sortedFlights, cacheEntryOptions);
 
             return sortedFlights;
         }
         else
         {
-            _logger.LogInformation("Retrieving flights from cache.");
+            _logger.LogInformationWithMethod($"Retrieving flights from cache.");
             return _cachedFlights!;
         }
     }

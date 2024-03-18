@@ -23,7 +23,7 @@ public class FlightsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> SearchFlights([FromQuery] FlightSortParams sortParams)
     {
-        _logger.LogInformation($"{MethodBase.GetCurrentMethod()?.Name}. FlightSortParams: {sortParams}");
+        _logger.LogInformationWithMethod($"FlightSortParams: {sortParams}");
 
         var flights = await _flightService.GetAggregatedFlights(sortParams);
         return Ok(flights);
@@ -33,8 +33,7 @@ public class FlightsController : ControllerBase
     public async Task<IActionResult> SearchFlights([FromQuery] FlightSearchParams searchParams,
         [FromQuery] FlightSortParams sortParams)
     {
-        _logger.LogInformation(
-            $"{MethodBase.GetCurrentMethod()?.Name}. FlightSearchParams {searchParams}, FlightSortParams: {sortParams}");
+        _logger.LogInformationWithMethod($"FlightSearchParams: {searchParams},  FlightSortParams: {sortParams}");
 
         var flights = await _flightService.GetFlightsByFilters(searchParams, sortParams);
         return Ok(flights);
