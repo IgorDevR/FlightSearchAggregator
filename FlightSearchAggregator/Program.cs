@@ -1,14 +1,16 @@
 using FlightSearchAggregator;
+using FlightSearchAggregator.Helpers;
 using FlightSearchAggregator.Services;
 using FlightSearchAggregator.Services.Bookings;
 using FlightSearchAggregator.Services.Providers;
 using Microsoft.OpenApi.Models;
 using Serilog;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
 ConfigureAppSettings(builder.Services, builder.Configuration);
-ConfigureServices(builder.Services);
+ConfigureServices(builder.Services, builder.Configuration);
 ConfigureLogging(builder.Host);
 
 var app = builder.Build();
@@ -22,7 +24,7 @@ void ConfigureAppSettings(IServiceCollection services, IConfiguration configurat
     services.Configure<AppSettings>(configuration);
 }
 
-void ConfigureServices(IServiceCollection services)
+void ConfigureServices(IServiceCollection services, ConfigurationManager configuration)
 {
     services.AddControllers().AddJsonOptions(opts =>
     {
@@ -33,16 +35,29 @@ void ConfigureServices(IServiceCollection services)
     services.AddSwaggerGen(c =>
     {
         c.SwaggerDoc("v1", new OpenApiInfo { Title = "My API", Version = "v1" });
+        var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+        c.IncludeXmlComments(xmlPath);
+
+        c.EnableAnnotations();
+        c.DescribeAllParametersInCamelCase();
+
         c.UseInlineDefinitionsForEnums();
+
     });
+    HttpClientConfig(services, configuration);
 
     services.AddMemoryCache();
     services.AddAutoMapper(typeof(Program));
     services.AddLogging();
     services.AddScoped<FlightService>();
     services.AddScoped<IFlyQuestService, FlyQuestService>();
+    services.AddScoped<IBookingService, FlyQuestService>();
     services.AddScoped<ISkyTrailsService, SkyTrailsService>();
- 
+    services.AddScoped<IBookingService, SkyTrailsService>();
+    services.AddScoped<BookFlightService>();
+    services.AddScoped<BookingServiceFactory>();
+    services.AddScoped<HttpService>();
 }
 
 void ConfigureLogging(IHostBuilder hostBuilder)
@@ -63,7 +78,7 @@ void ConfigureApp(WebApplication app)
     if (app.Environment.IsDevelopment())
     {
         app.UseSwagger();
-        app.UseSwaggerUI();
+        app.UseSwaggerUI(c => { c.SwaggerEndpoint("/swagger/v1/swagger.json", "My API V1"); });
     }
 
     app.UseHttpsRedirection();
@@ -71,4 +86,23 @@ void ConfigureApp(WebApplication app)
     app.UseAuthorization();
 
     app.MapControllers();
+}
+
+void HttpClientConfig(IServiceCollection serviceCollection, ConfigurationManager configuration)
+{
+    var appSettings = configuration.Get<AppSettings>();
+
+    serviceCollection.AddHttpClient("SkyTrailsClient", client =>
+    {
+        client.BaseAddress = new Uri(appSettings.SkyTrailsBaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(60);
+        client.DefaultRequestHeaders.Add("Accept", "application/json");
+    });
+
+    serviceCollection.AddHttpClient("FlyQuestClient", client =>
+    {
+        client.BaseAddress = new Uri(appSettings.FlyQuestBaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(60);
+        client.DefaultRequestHeaders.Add("Accept", "application/json");
+    });
 }
