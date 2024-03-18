@@ -59,11 +59,8 @@ namespace FlightSearchAggregator.Helpers
                     }
                 });
 
-            CreateMap<FlyQuestBookingDetailDto, BookingDetailDto>()
-                .ForMember(dest => dest.BookingId, opt => opt.MapFrom(src => src.Id));
-
-            CreateMap<SkyTrailsBookingDetailDto, BookingDetailDto>()
-                .ForMember(dest => dest.BookingId, opt => opt.MapFrom(src => src.Id));
+            CreateMap<FlyQuestBookingDetailDto, BookingDetailDto>();
+            CreateMap<SkyTrailsBookingDetailDto, BookingDetailDto>();
 
             CreateMap<Booking, BookingDetailDto>()
                 .ForMember(dest => dest.BookingId, opt => opt.MapFrom(src => src.Id));
