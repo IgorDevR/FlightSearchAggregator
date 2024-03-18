@@ -1,52 +1,20 @@
 ﻿using DataSourceFlyQuest.Models;
+using System;
 
 namespace DataSourceFlyQuest.Services;
 
 public class FlightService
 {
-    private static readonly Random _random = new Random();
-
-    private static readonly List<string> _aircraftTypes = new List<string>
-        { "Boeing 737", "Airbus A320", "Boeing 777", "Airbus A380" };
-
-    private static readonly Dictionary<string, string> _citiesAndCodes = new Dictionary<string, string>
-    {
-        { "New York", "JFK" },
-        { "London", "LHR" },
-        { "Paris", "CDG" },
-        { "Tokyo", "HND" },
-        { "Sydney", "SYD" },
-        { "Los Angeles", "LAX" },
-        { "Berlin", "BER" },
-        { "Moscow", "SVO" }
-    };
-
-    private static readonly List<string> _airlines = new List<string>
-    {
-        "American Airlines",
-        "Delta Air Lines",
-        "United Airlines",
-        "Southwest Airlines",
-        "Air France",
-        "Lufthansa",
-        "British Airways",
-        "Qantas Airways",
-        "Emirates",
-        "Cathay Pacific",
-        "Singapore Airlines",
-        "All Nippon Airways"
-    };
-
-    private readonly List<FlightFlyQuest> FlightFlyQuests = Generate();
+    private static readonly List<BookingDetail> _bookingDetails = new List<BookingDetail>();
 
     public List<FlightFlyQuest> GetFlights()
     {
-        return FlightFlyQuests;
+        return FlightDataGenerator.FlightFlyQuests;
     }
 
     public List<FlightFlyQuest> GetFlightsByFilters(FlightSearchParamsFlyQuest searchParams)
     {
-        var flights = Generate();
+        var flights = FlightDataGenerator.FlightFlyQuests;
 
         return flights
             .Where(f => (string.IsNullOrEmpty(searchParams.Airline) || f.Airline == searchParams.Airline))
@@ -57,43 +25,32 @@ public class FlightService
             .ToList();
     }
 
-    public FlightFlyQuest? GenerateFlight(Guid id)
+    public FlightFlyQuest? GetFlight(Guid id)
     {
-        return FlightFlyQuests.FirstOrDefault(f => f.Id == id);
+        return FlightDataGenerator.FlightFlyQuests.FirstOrDefault(f => f.Id == id);
     }
 
-    private static List<FlightFlyQuest> Generate()
+    public BookingDetail Book(FlightFlyQuest flight, BookingRequest bookingRequest)
     {
-        var flights = new List<FlightFlyQuest>();
-
-        List<string> cityKeys = _citiesAndCodes.Keys.ToList();
-        for (int i = 0; i < 10; i++)
+        var bookingDetail = new BookingDetail
         {
-            var originCity = cityKeys[_random.Next(cityKeys.Count)];
-            var destinationCity = cityKeys[_random.Next(cityKeys.Count)];
+            Id = Guid.NewGuid(),
+            FlightId = flight.Id,
+            ServiceId = bookingRequest.ServiceId,
+            PassengerName = bookingRequest.PassengerName,
+            Phone = bookingRequest.Phone,
+            Seat = bookingRequest.Seat,
+            Price = flight.Price,
+            Result = "Successfully"
+        };
 
-            while (destinationCity == originCity)
-            {
-                destinationCity = cityKeys[_random.Next(cityKeys.Count)];
-            }
+        _bookingDetails.Add(bookingDetail);
+        return bookingDetail;
+    }
 
-            flights.Add(new FlightFlyQuest
-            {
-                Airline = _airlines[_random.Next(_airlines.Count)],
-                FlightNumber = $"A{_random.Next(100, 999)}",
-                Origin = originCity,
-                Destination = destinationCity,
-                OriginAirportCode = _citiesAndCodes[originCity],
-                DestinationAirportCode = _citiesAndCodes[destinationCity],
-                DepartureTime = DateTime.Now.AddHours(_random.Next(1, 100)),
-                ArrivalTime = DateTime.Now.AddHours(_random.Next(101, 200)),
-                Price = _random.Next(100, 500),
-                Layovers = _random.Next(0, 5),
-                AircraftType = _aircraftTypes[_random.Next(_aircraftTypes.Count)],
-                WifiAvailable = _random.Next(2) == 0
-            });
-        }
-
-        return flights;
+    public BookingDetail? GetBookingDetail(Guid id)
+    {
+        var bookingDetail = _bookingDetails.FirstOrDefault(_ => _.Id == id);
+        return bookingDetail;
     }
 }

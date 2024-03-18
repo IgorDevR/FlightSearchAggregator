@@ -24,7 +24,7 @@ namespace DataSourceFlyQuest.Controllers
         [HttpGet("{id}")]
         public IActionResult GetFlight(Guid id)
         {
-            var flights = _flightService.GenerateFlight(id);
+            var flights = _flightService.GetFlight(id);
             if (flights == null)
             {
                 return NotFound($"Flight with Id: {id} not found");
@@ -38,6 +38,25 @@ namespace DataSourceFlyQuest.Controllers
         {
             var flights = _flightService.GetFlightsByFilters(searchParams);
             return Ok(flights);
+        }
+
+
+        [HttpGet("book/{id}")]
+        public async Task<IActionResult> GetBookingDetail(Guid id)
+        {
+            var bookingDetail = _flightService.GetBookingDetail(id);
+            return Ok(bookingDetail);
+        }
+
+        [HttpPost("book")]
+        public async Task<IActionResult> BookFlight([FromBody] BookingRequest bookingRequest)
+        {
+            var flight = _flightService.GetFlight(bookingRequest.FlightId);
+            if (flight == null)
+                return NotFound($"Flight with id {bookingRequest.FlightId} not found");
+
+            var bookingDetail = _flightService.Book(flight, bookingRequest);
+            return Ok(bookingDetail);
         }
     }
 }
