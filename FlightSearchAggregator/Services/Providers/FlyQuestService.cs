@@ -1,9 +1,13 @@
-﻿using System.Reflection;
-using AutoMapper;
+﻿using AutoMapper;
+using FlightSearchAggregator.DbContext;
 using FlightSearchAggregator.Dtos;
+using FlightSearchAggregator.Dtos.Providers;
 using FlightSearchAggregator.Helpers;
 using FlightSearchAggregator.Models;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
+using System.Reflection;
+using FlightSearchAggregator.Services.Bookings;
 
 namespace FlightSearchAggregator.Services.Providers;
 
@@ -14,81 +18,80 @@ public interface IFlyQuestService
     Task<List<Flight>> GetFlightsByFilters(FlightSearchParams departureDate);
 }
 
-public class FlyQuestService : IFlyQuestService
+public class FlyQuestService : IFlyQuestService, IBookingService
 {
     private readonly IMapper _mapper;
     private readonly AppSettings _settings;
     private readonly ILogger _logger;
 
-    private readonly string _baseUrl;
+    private readonly HttpService _httpService;
 
-    public FlyQuestService(IMapper mapper, IOptions<AppSettings> settings, ILogger<FlyQuestService> logger)
+    private const string _clineName = "FlyQuestClient";
+
+    public FlyQuestService(IMapper mapper, HttpService httpService, IOptions<AppSettings> settings,
+        ILogger<FlyQuestService> logger)
     {
         _settings = settings.Value;
+        _httpService = httpService;
         _logger = logger;
         _mapper = mapper;
-
-        _baseUrl = _settings.FlyQuestBaseUrl;
     }
 
     public async Task<List<Flight>> GetFlights()
     {
-        try
-        {
-            List<Flight> flights = new List<Flight>();
+        var flightsFlyQuest = await _httpService.ExecuteGetRequest<List<FlyQuestDto>>(_clineName,"flights");
+        var flights = _mapper.Map<List<Flight>>(flightsFlyQuest);
 
-            using var httpClient = new HttpClient
-            {
-                Timeout = TimeSpan.FromSeconds(60)
-            };
-            var response = await httpClient.GetAsync($"{_baseUrl}/flights");
-            if (response.IsSuccessStatusCode)
-            {
-                var flightsFlyQuest = await response.Content.ReadFromJsonAsync<List<FlyQuestDto>>();
-                flights = _mapper.Map<List<Flight>>(flightsFlyQuest);
-            }
-
-            return flights;
-        }
-        catch (HttpRequestException ex)
-        {
-            throw new Exception(
-                $"{MethodBase.GetCurrentMethod()?.Name}. Error while retrieving flight data from FlyQuest.", ex);
-        }
+        return flights;
     }
 
     public async Task<List<Flight>> GetFlightsByFilters(FlightSearchParams flightSearchParams)
     {
-        var searchParams = new
+        var queryParams = new Dictionary<string, string>
         {
-            Airline = flightSearchParams.Airline?.GetDescription(),
-            DepartureTime = flightSearchParams.DepartureDate,
-            MaxPrice = flightSearchParams.MaxPrice,
-            WifiAvailable = flightSearchParams.WifiAvailable,
+            { "airline", flightSearchParams.Airline?.GetDescription() },
+            { "departureTime", flightSearchParams.DepartureDate?.ToString("yyyy-MM-dd") },
+            { "maxPrice", flightSearchParams.MaxPrice?.ToString() },
+            { "wifiAvailable", flightSearchParams.WifiAvailable?.ToString() }
         };
 
-        try
-        {
-            List<Flight> flights = new List<Flight>();
+        var queryString =
+            QueryHelpers.AddQueryString("flights/search",
+                queryParams.Where(kvp => kvp.Value != null));
 
-            using var httpClient = new HttpClient
-            {
-                Timeout = TimeSpan.FromSeconds(60)
-            };
-            var response = await httpClient.GetAsync($"{_baseUrl}/flights/search");
-            if (response.IsSuccessStatusCode)
-            {
-                var flightsFlyQuest = await response.Content.ReadFromJsonAsync<List<FlyQuestDto>>();
-                flights = _mapper.Map<List<Flight>>(flightsFlyQuest);
-            }
+        var flightsFlyQuest = await _httpService.ExecuteGetRequest<List<FlyQuestDto>>(_clineName, queryString);
 
-            return flights;
-        }
-        catch (HttpRequestException ex)
+        return _mapper.Map<List<Flight>>(flightsFlyQuest);
+    }
+
+    public async Task<BookingDetailDto?> SubmitFlightBooking(BookingRequest bookingRequest)
+    {
+        var flightBookingDto = _mapper.Map<FlyQuestBookingRequestDto>(bookingRequest,
+            opts => { opts.Items["ServiceId"] = _settings.ServiceId; });
+        var FlyQuestBookingDetailDto =
+            await _httpService.ExecutePostRequest<FlyQuestBookingRequestDto, FlyQuestBookingDetailDto>(_clineName,
+                "flights/book",
+                flightBookingDto);
+
+        var booking = new Booking
         {
-            throw new Exception(
-                $"{MethodBase.GetCurrentMethod()?.Name}. Error while retrieving flight data from FlyQuest.",
-                ex);
-        }
+            Id = Guid.NewGuid(),
+            ProviderBookingId = FlyQuestBookingDetailDto.Id,
+            DataProvider = EnumExtensions.ParseEnum(bookingRequest.DataProvider, FlightDataProvider.Unknown),
+            FlightId = bookingRequest.FlightId,
+            Name = bookingRequest.PassengerName,
+            Result = FlyQuestBookingDetailDto.Result
+        };
+        DbEmulation.Bookings.Add(booking.Id, booking);
+
+        var bookingDetail = _mapper.Map<BookingDetailDto>(booking);
+        return bookingDetail;
+    }
+
+    public async Task<BookingDetailDto?> GetBookingDetail(Guid id)
+    {
+        var flyQuestBookingDetailDto =
+            await _httpService.ExecuteGetRequest<FlyQuestBookingDetailDto>(_clineName,$"flights/book/{id}");
+        return _mapper.Map<BookingDetailDto>(flyQuestBookingDetailDto);
     }
 }

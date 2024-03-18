@@ -1,9 +1,13 @@
-﻿using System.Reflection;
-using AutoMapper;
+﻿using AutoMapper;
+using FlightSearchAggregator.DbContext;
 using FlightSearchAggregator.Dtos;
+using FlightSearchAggregator.Dtos.Providers;
 using FlightSearchAggregator.Helpers;
 using FlightSearchAggregator.Models;
+using FlightSearchAggregator.Services.Bookings;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 
 namespace FlightSearchAggregator.Services.Providers;
 
@@ -11,84 +15,80 @@ public interface ISkyTrailsService
 {
     Task<List<Flight>> GetFlights();
 
-    Task<List<Flight>> GetFlightsByFilters(FlightSearchParams flightSearchParams);
+    Task<List<Flight>> GetFlightsByFilters(FlightSearchParams departureDate);
 }
 
-public class SkyTrailsService : ISkyTrailsService
+public class SkyTrailsService : ISkyTrailsService, IBookingService
 {
     private readonly IMapper _mapper;
     private readonly AppSettings _settings;
     private readonly ILogger _logger;
 
-    private readonly string _baseUrl;
-
-    public SkyTrailsService(IMapper mapper, IOptions<AppSettings> settings, ILogger<SkyTrailsService> logger)
+    private readonly HttpService _httpService;
+    private const string _clineName = "SkyTrailsClient";
+    public SkyTrailsService(IMapper mapper, HttpService httpService, IOptions<AppSettings> settings,
+        ILogger<SkyTrailsService> logger)
     {
         _mapper = mapper;
+        _httpService = httpService;
         _settings = settings.Value;
         _logger = logger;
-
-        _baseUrl = _settings.SkyTrailsBaseUrl;
     }
 
     public async Task<List<Flight>> GetFlights()
     {
-        try
-        {
-            List<Flight> flights = new List<Flight>();
+        var flightsSkyTrails = await _httpService.ExecuteGetRequest<List<SkyTrailsDto>>(_clineName,"flights");
+        var flights = _mapper.Map<List<Flight>>(flightsSkyTrails);
 
-            using var httpClient = new HttpClient
-            {
-                Timeout = TimeSpan.FromSeconds(60)
-            };
-            var response = await httpClient.GetAsync($"{_baseUrl}/flights");
-            if (response.IsSuccessStatusCode)
-            {
-                var flightsSkyTrails = await response.Content.ReadFromJsonAsync<List<SkyTrailsDto>>();
-                flights = _mapper.Map<List<Flight>>(flightsSkyTrails);
-            }
-
-            return flights;
-        }
-        catch (HttpRequestException ex)
-        {
-            throw new Exception(
-                $"{MethodBase.GetCurrentMethod()?.Name}. Error while retrieving flight data from SkyTrails.", ex);
-        }
+        return flights;
     }
 
     public async Task<List<Flight>> GetFlightsByFilters(FlightSearchParams flightSearchParams)
     {
-        var searchParams = new
+        var queryParams = new Dictionary<string, string>
         {
-            Airline = flightSearchParams.Airline?.GetDescription(),
-            Depart = flightSearchParams.DepartureDate,
-            MaxPrice = flightSearchParams.MaxPrice,
-            Refundable = flightSearchParams.Refundable,
+            { "airline", flightSearchParams.Airline?.GetDescription() },
+            { "depart", flightSearchParams.DepartureDate?.ToString("yyyy-MM-dd") },
+            { "maxPrice", flightSearchParams.MaxPrice?.ToString() },
+            { "refundable", flightSearchParams.Refundable?.ToString() }
         };
 
-        try
-        {
-            List<Flight> flights = new List<Flight>();
+        var queryString =
+            QueryHelpers.AddQueryString("flights/search-by-filters",
+                queryParams.Where(kvp => kvp.Value != null));
 
-            using var httpClient = new HttpClient
-            {
-                Timeout = TimeSpan.FromSeconds(60),
-            };
-            var response = await httpClient.GetAsync($"{_baseUrl}/flights/search-by-filters");
-            if (response.IsSuccessStatusCode)
-            {
-                var flightsSkyTrails = await response.Content.ReadFromJsonAsync<List<SkyTrailsDto>>();
-                flights = _mapper.Map<List<Flight>>(flightsSkyTrails);
-            }
+        var flightsSkyTrails = await _httpService.ExecuteGetRequest<List<SkyTrailsDto>>(_clineName,queryString);
 
-            return flights;
-        }
-        catch (HttpRequestException ex)
-        {
-            throw new Exception(
-                $"{MethodBase.GetCurrentMethod()?.Name}. Error while retrieving flight data from SkyTrails.", ex);
-        }
+        return _mapper.Map<List<Flight>>(flightsSkyTrails);
     }
 
+    public async Task<BookingDetailDto?> SubmitFlightBooking(BookingRequest bookingRequest)
+    {
+        var flightBookingDto = _mapper.Map<SkyTrailsBookingRequestDto>(bookingRequest,
+            opts => { opts.Items["ServiceId"] = _settings.ServiceId; });
+        var skyTrailsBookingDetailDto =
+            await _httpService.ExecutePostRequest<SkyTrailsBookingRequestDto, SkyTrailsBookingDetailDto>(_clineName,"flights/book",
+                flightBookingDto);
+
+        var booking = new Booking
+        {
+            Id = Guid.NewGuid(),
+            ProviderBookingId = skyTrailsBookingDetailDto.Id,
+            DataProvider = EnumExtensions.ParseEnum(bookingRequest.DataProvider, FlightDataProvider.Unknown),
+            FlightId = bookingRequest.FlightId,
+            Name = bookingRequest.PassengerName,
+            Result = skyTrailsBookingDetailDto.Result
+        };
+        DbEmulation.Bookings.Add(booking.Id, booking);
+
+        var bookingDetail = _mapper.Map<BookingDetailDto>(booking);
+        return bookingDetail;
+    }
+
+    public async Task<BookingDetailDto?> GetBookingDetail(Guid id)
+    {
+        var flyQuestBookingDetailDto =
+            await _httpService.ExecuteGetRequest<SkyTrailsBookingDetailDto>(_clineName, $"flights/book/{id}");
+        return _mapper.Map<BookingDetailDto>(flyQuestBookingDetailDto);
+    }
 }
