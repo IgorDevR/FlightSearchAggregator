@@ -1,0 +1,6 @@
+@DataSourceSkyTrails_HostAddress = http://localhost:5197
+
+GET {{DataSourceSkyTrails_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
