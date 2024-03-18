@@ -1,5 +1,6 @@
 using AutoMapper;
 using FlightSearchAggregator.Dtos;
+using FlightSearchAggregator.Dtos.Providers;
 using FlightSearchAggregator.Models;
 
 namespace FlightSearchAggregator.Helpers
@@ -38,7 +39,7 @@ namespace FlightSearchAggregator.Helpers
                 .AfterMap((src, dest) => { dest.WifiAvailable ??= false; })
                 .AfterMap((src, dest) => { dest.DataProvider = FlightDataProvider.SkyTrails; });
 
-            CreateMap<BookingRequest, FlightBookingDto>()
+            CreateMap<BookingRequest, FlyQuestBookingRequestDto>()
                 .AfterMap((src, dest) => { dest.Created = DateTimeOffset.UtcNow; })
                 .AfterMap((src, dest, context) =>
                 {
@@ -46,7 +47,26 @@ namespace FlightSearchAggregator.Helpers
                     {
                         dest.ServiceId = new Guid(context.Items["ServiceId"].ToString());
                     }
-                }); 
+                });
+
+            CreateMap<BookingRequest, SkyTrailsBookingRequestDto>()
+                .AfterMap((src, dest) => { dest.Created = DateTimeOffset.UtcNow; })
+                .AfterMap((src, dest, context) =>
+                {
+                    if (context.Items.ContainsKey("ServiceId"))
+                    {
+                        dest.ServiceId = new Guid(context.Items["ServiceId"].ToString());
+                    }
+                });
+
+            CreateMap<FlyQuestBookingDetailDto, BookingDetailDto>()
+                .ForMember(dest => dest.BookingId, opt => opt.MapFrom(src => src.Id));
+
+            CreateMap<SkyTrailsBookingDetailDto, BookingDetailDto>()
+                .ForMember(dest => dest.BookingId, opt => opt.MapFrom(src => src.Id));
+
+            CreateMap<Booking, BookingDetailDto>()
+                .ForMember(dest => dest.BookingId, opt => opt.MapFrom(src => src.Id));
         }
 
         private static (string?, string?) SplitAirportCodes(string airportsCode)
