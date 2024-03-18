@@ -4,8 +4,10 @@ namespace DataSourceFlyQuest.Services;
 
 public static class FlightDataGenerator
 {
-    public static readonly List<FlightFlyQuest> FlightFlyQuests;
+    private static Timer? _timer;
+    public static List<FlightFlyQuest> FlightFlyQuests { get; private set; } = new List<FlightFlyQuest>();
     private static readonly Random _random = new Random();
+    private static readonly object _lock = new object();
 
     private static readonly List<string> _aircraftTypes = new List<string>
         { "Boeing 737", "Airbus A320", "Boeing 777", "Airbus A380" };
@@ -41,6 +43,7 @@ public static class FlightDataGenerator
     static FlightDataGenerator()
     {
         FlightFlyQuests = Generate();
+        _timer = new Timer(GenerateData, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
     }
 
     private static List<FlightFlyQuest> Generate()
@@ -77,5 +80,13 @@ public static class FlightDataGenerator
         }
 
         return flights;
+    }
+
+    private static void GenerateData(object? state)
+    {
+        lock (_lock)
+        {
+            FlightFlyQuests = Generate();
+        }
     }
 }

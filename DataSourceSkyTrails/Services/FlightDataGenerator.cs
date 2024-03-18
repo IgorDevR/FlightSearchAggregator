@@ -5,9 +5,9 @@ namespace DataSourceSkyTrails.Services;
 
 public static class FlightDataGenerator
 {
-    public static readonly List<FlightSkyTrails> FlightSkyTrails;
-
+    public static List<FlightSkyTrails> FlightSkyTrails { get; private set; } = new List<FlightSkyTrails>();
     private static readonly Random _random = new Random();
+    private static readonly object _lock = new object();
 
     private static readonly Dictionary<string, string> _citiesAndCodes = new Dictionary<string, string>
     {
@@ -74,5 +74,13 @@ public static class FlightDataGenerator
         }
 
         return flights;
+    }
+
+    private static void GenerateData(object? state)
+    {
+        lock (_lock)
+        {
+            FlightSkyTrails = Generate();
+        }
     }
 }
