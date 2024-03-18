@@ -4,6 +4,7 @@ using FlightSearchAggregator.Helpers;
 using FlightSearchAggregator.Models;
 using FlightSearchAggregator.Services;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace FlightSearchAggregator.Controllers;
 
@@ -21,6 +22,10 @@ public class FlightsController : ControllerBase
     }
 
     [HttpGet]
+    [SwaggerOperation(Summary = "Searches for flights",
+        Description = "Retrieves a list of flights based on sorting parameters.")]
+    [SwaggerResponse(StatusCodes.Status200OK, "Flight search results returned successfully", typeof(IEnumerable<Flight>))]
+
     public async Task<IActionResult> SearchFlights([FromQuery] FlightSortParams sortParams)
     {
         _logger.LogInformationWithMethod($"FlightSortParams: {sortParams}");
@@ -30,6 +35,10 @@ public class FlightsController : ControllerBase
     }
 
     [HttpGet("search")]
+    [SwaggerOperation(Summary = "Searches for flights with filters",
+        Description = "Retrieves a list of flights based on search and sorting parameters.")]
+    [SwaggerResponse(StatusCodes.Status200OK, "Flight search results with filters returned successfully", typeof(IEnumerable<Flight>))]
+
     public async Task<IActionResult> SearchFlights([FromQuery] FlightSearchParams searchParams,
         [FromQuery] FlightSortParams sortParams)
     {

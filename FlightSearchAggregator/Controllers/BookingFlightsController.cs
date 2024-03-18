@@ -3,6 +3,7 @@ using FlightSearchAggregator.Helpers;
 using FlightSearchAggregator.Models;
 using FlightSearchAggregator.Services.Bookings;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace FlightSearchAggregator.Controllers;
 
@@ -20,6 +21,11 @@ public class BookingFlightsController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [SwaggerOperation(Summary = "Retrieves booking details by ID",
+        Description = "Provides detailed information about a booking, including passenger details and flight information.")]
+    [SwaggerResponse(StatusCodes.Status200OK, "Booking details retrieved successfully", typeof(BookingDetailDto))]
+    [SwaggerResponse(StatusCodes.Status404NotFound, "Booking with the specified ID was not found")]
+
     public async Task<IActionResult> GetBookingDetail(Guid id)
     {
         _logger.LogInformationWithMethod($"Guid: {id}");
@@ -33,6 +39,11 @@ public class BookingFlightsController : ControllerBase
     }
 
     [HttpPost]
+    [SwaggerOperation(Summary = "Creates a new flight booking",
+        Description = "Submits a booking request for a flight. The request must include passenger details and flight information.")]
+    [SwaggerResponse(StatusCodes.Status200OK, "Booking created successfully", typeof(BookingDetailDto))]
+    [SwaggerResponse(StatusCodes.Status404NotFound, "Flight data provider not found")]
+
     public async Task<IActionResult> BookFlight([FromBody] BookingRequest bookingRequest)
     {
         _logger.LogInformationWithMethod($"BookingRequest: {bookingRequest}");
