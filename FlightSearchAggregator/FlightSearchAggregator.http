@@ -1,0 +1,6 @@
+@FlightSearchAggregator_HostAddress = http://localhost:5029
+
+GET {{FlightSearchAggregator_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
