@@ -31,6 +31,7 @@ public class BookFlightService
 
         var bookingService = _bookingServiceFactory.GetBookingService(booking.DataProvider);
         var bookingDetailDto = await bookingService.GetBookingDetail(booking.ProviderBookingId);
+        bookingDetailDto.BookingId = id;
 
         return bookingDetailDto;
     }
