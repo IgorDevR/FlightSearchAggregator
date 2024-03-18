@@ -6,6 +6,13 @@ using FlightSearchAggregator.Services.Providers;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using System.Reflection;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using FlightSearchAggregator.Auth;
+using FlightSearchAggregator.DbContext;
+using Swashbuckle.AspNetCore.Filters;
+using System.IdentityModel.Tokens.Jwt;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,30 +29,46 @@ app.Run();
 void ConfigureAppSettings(IServiceCollection services, IConfiguration configuration)
 {
     services.Configure<AppSettings>(configuration);
+    CreateTestUser(configuration);
 }
 
 void ConfigureServices(IServiceCollection services, ConfigurationManager configuration)
 {
+    services.AddCors(options =>
+    {
+        options.AddPolicy("AllowSpecificOrigin",
+            builder => builder.WithOrigins("http://127.0.0.1:5500")
+                .AllowAnyHeader()
+                .AllowAnyMethod());
+    });
+
+    services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = configuration["Jwt:Issuer"],
+                ValidAudience = configuration["Jwt:Audience"],
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Key"]))
+            };
+        });
+
     services.AddControllers().AddJsonOptions(opts =>
     {
         opts.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
 
     services.AddEndpointsApiExplorer();
-    services.AddSwaggerGen(c =>
-    {
-        c.SwaggerDoc("v1", new OpenApiInfo { Title = "My API", Version = "v1" });
-        var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-        c.IncludeXmlComments(xmlPath);
+    SwaggerConfig(services);
 
-        c.EnableAnnotations();
-        c.DescribeAllParametersInCamelCase();
-
-        c.UseInlineDefinitionsForEnums();
-
-    });
     HttpClientConfig(services, configuration);
+
+    services.AddScoped<AuthService>(serviceProvider =>
+        new AuthService(builder.Configuration));
 
     services.AddMemoryCache();
     services.AddAutoMapper(typeof(Program));
@@ -58,6 +81,7 @@ void ConfigureServices(IServiceCollection services, ConfigurationManager configu
     services.AddScoped<BookFlightService>();
     services.AddScoped<BookingServiceFactory>();
     services.AddScoped<HttpService>();
+    services.AddSwaggerExamplesFromAssemblyOf<Program>();
 }
 
 void ConfigureLogging(IHostBuilder hostBuilder)
@@ -74,6 +98,9 @@ void ConfigureLogging(IHostBuilder hostBuilder)
 
 void ConfigureApp(WebApplication app)
 {
+    app.UseCors("AllowSpecificOrigin");
+    app.UseRouting();
+
     // Configure the HTTP request pipeline.
     if (app.Environment.IsDevelopment())
     {
@@ -83,6 +110,7 @@ void ConfigureApp(WebApplication app)
 
     app.UseHttpsRedirection();
 
+    app.UseAuthentication();
     app.UseAuthorization();
 
     app.MapControllers();
@@ -105,4 +133,74 @@ void HttpClientConfig(IServiceCollection serviceCollection, ConfigurationManager
         client.Timeout = TimeSpan.FromSeconds(60);
         client.DefaultRequestHeaders.Add("Accept", "application/json");
     });
+}
+
+void SwaggerConfig(IServiceCollection serviceCollection)
+{
+    DbEmulation.Users.TryGetValue("testUser@gmail.com", out var user);
+    serviceCollection.AddSwaggerGen(c =>
+    {
+        c.SwaggerDoc("v1", new OpenApiInfo { Title = "My API", Version = "v1" });
+
+        c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+        {
+            Description = "JWT Authorization header using the Bearer scheme. Example: 'Authorization: Bearer " +
+                          user.TokenForExample + "'",
+            Name = "Authorization",
+            Type = SecuritySchemeType.ApiKey,
+            Scheme = "Bearer",
+            BearerFormat = "JWT",
+            In = ParameterLocation.Header,
+        });
+
+        c.AddSecurityRequirement(new OpenApiSecurityRequirement
+        {
+            {
+                new OpenApiSecurityScheme
+                {
+                    Reference = new OpenApiReference
+                    {
+                        Type = ReferenceType.SecurityScheme,
+                        Id = "Bearer"
+                    }
+                },
+                new string[] { }
+            }
+        });
+
+        var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+        c.IncludeXmlComments(xmlPath);
+
+        c.EnableAnnotations();
+        c.DescribeAllParametersInCamelCase();
+
+        c.UseInlineDefinitionsForEnums();
+        c.ExampleFilters();
+    });
+}
+
+void CreateTestUser(IConfiguration configuration)
+{
+    var testEmail = "testUser@gmail.com";
+    var passwordHash = Convert.ToBase64String(System.Security.Cryptography.SHA256.Create()
+        .ComputeHash(Encoding.UTF8.GetBytes("test123")));
+
+    var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]));
+    var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+    var token = new JwtSecurityToken(
+        issuer: builder.Configuration["Jwt:Issuer"],
+        audience: builder.Configuration["Jwt:Audience"],
+        expires: DateTime.Now.AddYears(100),
+        signingCredentials: credentials);
+
+    var testUser = new User
+    {
+        FullName = "Test User",
+        Email = testEmail,
+        PasswordHash = passwordHash,
+        TokenForExample = new JwtSecurityTokenHandler().WriteToken(token)
+    };
+    DbEmulation.Users.Add(testEmail, testUser);
 }
