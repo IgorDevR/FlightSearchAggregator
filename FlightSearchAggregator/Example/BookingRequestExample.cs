@@ -1,6 +1,8 @@
-﻿using FlightSearchAggregator.Dtos;
-using FlightSearchAggregator.Models;
+﻿using FlightSearchAggregator.Auth;
+using FlightSearchAggregator.Dtos;
 using Swashbuckle.AspNetCore.Filters;
+
+namespace FlightSearchAggregator.Example;
 
 public class BookingRequestExample : IExamplesProvider<BookingRequest>
 {
@@ -8,12 +10,24 @@ public class BookingRequestExample : IExamplesProvider<BookingRequest>
     {
         return new BookingRequest
         {
-            FlightId = Guid.Parse("3235e614-62fa-46f7-95f7-94e06bf49fd6"),
+            FlightId = Guid.Parse("985636ed-3106-4c03-aba5-645011d1db27"),
             DataProvider = "SkyTrails",
             PassengerName = "John Doe",
             Phone = "+123456789",
             Email = "john.doe@example.com",
             Seat = 1
+        };
+    }
+}
+
+public class LoginExample : IExamplesProvider<LoginModel>
+{
+    public LoginModel GetExamples()
+    {
+        return new LoginModel
+        {
+           Email = "testUser@gmail.com",
+           Password = "test123"
         };
     }
 }
