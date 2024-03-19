@@ -7,18 +7,17 @@ using FlightSearchAggregator.Models;
 using FlightSearchAggregator.Services.Bookings;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 
 namespace FlightSearchAggregator.Services.Providers;
 
-public interface ISkyTrailsService
+public interface ISkyTrailsService : IBookingService
 {
     Task<List<Flight>> GetFlights();
 
     Task<List<Flight>> GetFlightsByFilters(FlightSearchParams departureDate);
 }
 
-public class SkyTrailsService : ISkyTrailsService, IBookingService
+public class SkyTrailsService : ISkyTrailsService
 {
     private readonly IMapper _mapper;
     private readonly AppSettings _settings;
@@ -26,6 +25,7 @@ public class SkyTrailsService : ISkyTrailsService, IBookingService
 
     private readonly HttpService _httpService;
     private const string _clineName = "SkyTrailsClient";
+
     public SkyTrailsService(IMapper mapper, HttpService httpService, IOptions<AppSettings> settings,
         ILogger<SkyTrailsService> logger)
     {
@@ -37,7 +37,7 @@ public class SkyTrailsService : ISkyTrailsService, IBookingService
 
     public async Task<List<Flight>> GetFlights()
     {
-        var flightsSkyTrails = await _httpService.ExecuteGetRequest<List<SkyTrailsDto>>(_clineName,"flights");
+        var flightsSkyTrails = await _httpService.ExecuteGetRequest<List<SkyTrailsDto>>(_clineName, "flights");
         var flights = _mapper.Map<List<Flight>>(flightsSkyTrails);
 
         return flights;
@@ -57,7 +57,7 @@ public class SkyTrailsService : ISkyTrailsService, IBookingService
             QueryHelpers.AddQueryString("flights/search-by-filters",
                 queryParams.Where(kvp => kvp.Value != null));
 
-        var flightsSkyTrails = await _httpService.ExecuteGetRequest<List<SkyTrailsDto>>(_clineName,queryString);
+        var flightsSkyTrails = await _httpService.ExecuteGetRequest<List<SkyTrailsDto>>(_clineName, queryString);
 
         return _mapper.Map<List<Flight>>(flightsSkyTrails);
     }
@@ -67,7 +67,8 @@ public class SkyTrailsService : ISkyTrailsService, IBookingService
         var flightBookingDto = _mapper.Map<SkyTrailsBookingRequestDto>(bookingRequest,
             opts => { opts.Items["ServiceId"] = _settings.ServiceId; });
         var skyTrailsBookingDetailDto =
-            await _httpService.ExecutePostRequest<SkyTrailsBookingRequestDto, SkyTrailsBookingDetailDto>(_clineName,"flights/book",
+            await _httpService.ExecutePostRequest<SkyTrailsBookingRequestDto, SkyTrailsBookingDetailDto>(_clineName,
+                "flights/book",
                 flightBookingDto);
 
         var booking = new Booking
@@ -90,5 +91,22 @@ public class SkyTrailsService : ISkyTrailsService, IBookingService
         var skyTrailsBookingDetailDto =
             await _httpService.ExecuteGetRequest<SkyTrailsBookingDetailDto>(_clineName, $"flights/book/{id}");
         return _mapper.Map<BookingDetailDto>(skyTrailsBookingDetailDto);
+    }
+
+    public async Task<Flight?> GetFlight(Guid flightId)
+    {
+        try
+        {
+            var skyTrailsDto = await _httpService.ExecuteGetRequest<SkyTrailsDto>(_clineName, $"flights/{flightId}");
+            return _mapper.Map<Flight>(skyTrailsDto);
+        }
+        catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+        catch (Exception e)
+        {
+            throw;
+        }
     }
 }

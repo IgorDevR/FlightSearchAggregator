@@ -1,34 +1,31 @@
 ﻿using FlightSearchAggregator.Models;
+using FlightSearchAggregator.Services.Providers;
 
 namespace FlightSearchAggregator.Services.Bookings;
 
-public class BookingServiceFactory
+public class FlightBookingFactory
 {
-    private readonly Dictionary<FlightDataProvider, IBookingService> _bookingServices;
-    private readonly ILogger<BookingServiceFactory> _logger;
+    private readonly IFlyQuestService _flyQuestService;
+    private readonly ISkyTrailsService _skyTrailsService;
+    private readonly ILogger<FlightBookingFactory> _logger;
 
-    public BookingServiceFactory(
-        IBookingService flyQuestService,
-        IBookingService skyTrailsService,
-        ILogger<BookingServiceFactory> logger)
+    public FlightBookingFactory(IFlyQuestService flyQuestService, ISkyTrailsService skyTrailsService,
+        ILogger<FlightBookingFactory> logger)
     {
-        _bookingServices = new Dictionary<FlightDataProvider, IBookingService>
-        {
-            { FlightDataProvider.FlyQuest, flyQuestService },
-            { FlightDataProvider.SkyTrails, skyTrailsService }
-        };
+        _flyQuestService = flyQuestService;
+        _skyTrailsService = skyTrailsService;
         _logger = logger;
     }
 
-    public IBookingService GetBookingService(FlightDataProvider dataProvider)
+    public IBookingService SelectService(FlightDataProvider dataProvider)
     {
-        if (!_bookingServices.TryGetValue(dataProvider, out var bookingService))
+        IBookingService selectedService = dataProvider switch
         {
-            var errorMsg = $"Unsupported flight data provider: {dataProvider}.";
-            _logger.LogError(errorMsg);
-            throw new NotSupportedException(errorMsg);
-        }
+            FlightDataProvider.FlyQuest => _flyQuestService,
+            FlightDataProvider.SkyTrails => _skyTrailsService,
+            _ => throw new NotSupportedException($"Unsupported flight data provider: {dataProvider}")
+        };
 
-        return bookingService;
+        return selectedService;
     }
 }

@@ -4,21 +4,20 @@ using FlightSearchAggregator.Dtos;
 using FlightSearchAggregator.Dtos.Providers;
 using FlightSearchAggregator.Helpers;
 using FlightSearchAggregator.Models;
+using FlightSearchAggregator.Services.Bookings;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
-using System.Reflection;
-using FlightSearchAggregator.Services.Bookings;
 
 namespace FlightSearchAggregator.Services.Providers;
 
-public interface IFlyQuestService
+public interface IFlyQuestService : IBookingService
 {
     Task<List<Flight>> GetFlights();
 
     Task<List<Flight>> GetFlightsByFilters(FlightSearchParams departureDate);
 }
 
-public class FlyQuestService : IFlyQuestService, IBookingService
+public class FlyQuestService : IFlyQuestService
 {
     private readonly IMapper _mapper;
     private readonly AppSettings _settings;
@@ -39,7 +38,7 @@ public class FlyQuestService : IFlyQuestService, IBookingService
 
     public async Task<List<Flight>> GetFlights()
     {
-        var flightsFlyQuest = await _httpService.ExecuteGetRequest<List<FlyQuestDto>>(_clineName,"flights");
+        var flightsFlyQuest = await _httpService.ExecuteGetRequest<List<FlyQuestDto>>(_clineName, "flights");
         var flights = _mapper.Map<List<Flight>>(flightsFlyQuest);
 
         return flights;
@@ -91,7 +90,25 @@ public class FlyQuestService : IFlyQuestService, IBookingService
     public async Task<BookingDetailDto?> GetBookingDetail(Guid id)
     {
         var flyQuestBookingDetailDto =
-            await _httpService.ExecuteGetRequest<FlyQuestBookingDetailDto>(_clineName,$"flights/book/{id}");
+            await _httpService.ExecuteGetRequest<FlyQuestBookingDetailDto>(_clineName, $"flights/book/{id}");
         return _mapper.Map<BookingDetailDto>(flyQuestBookingDetailDto);
+    }
+
+    public async Task<Flight?> GetFlight(Guid flightId)
+    {
+        try
+        {
+            var flightsFlyQuest =
+                await _httpService.ExecuteGetRequest<FlyQuestDto>(_clineName, $"flights/{flightId}");
+            return _mapper.Map<Flight>(flightsFlyQuest);
+        }
+        catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+        catch (Exception e)
+        {
+            throw;
+        }
     }
 }
