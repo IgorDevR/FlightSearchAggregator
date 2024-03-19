@@ -13,17 +13,27 @@ using FlightSearchAggregator.Auth;
 using FlightSearchAggregator.DbContext;
 using Swashbuckle.AspNetCore.Filters;
 using System.IdentityModel.Tokens.Jwt;
+using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Hosting;
+using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
 
 ConfigureAppSettings(builder.Services, builder.Configuration);
-ConfigureServices(builder.Services, builder.Configuration);
+
+var appSettings = builder.Configuration.Get<AppSettings>();
+builder.WebHost.UseUrls(appSettings.AppBaseUrlHttps, appSettings.AppBaseUrlHttp);
+
+ConfigureServices(builder.Services, builder.Configuration, appSettings);
 ConfigureLogging(builder.Host);
 
 var app = builder.Build();
 
 ConfigureApp(app);
 
+var logger = app.Services.GetService<ILogger<Program>>();
+logger.LogInformation($"Program run on: {appSettings.AppBaseUrlHttp}, {appSettings.AppBaseUrlHttps}, v 0.04");
 app.Run();
 
 void ConfigureAppSettings(IServiceCollection services, IConfiguration configuration)
@@ -32,12 +42,12 @@ void ConfigureAppSettings(IServiceCollection services, IConfiguration configurat
     CreateTestUser(configuration);
 }
 
-void ConfigureServices(IServiceCollection services, ConfigurationManager configuration)
+void ConfigureServices(IServiceCollection services, ConfigurationManager configuration, AppSettings settings)
 {
     services.AddCors(options =>
     {
         options.AddPolicy("AllowSpecificOrigin",
-            builder => builder.WithOrigins("http://127.0.0.1:5500")
+            builder => builder.WithOrigins(settings.AppOuterUrl)
                 .AllowAnyHeader()
                 .AllowAnyMethod());
     });
@@ -75,11 +85,9 @@ void ConfigureServices(IServiceCollection services, ConfigurationManager configu
     services.AddLogging();
     services.AddScoped<FlightService>();
     services.AddScoped<IFlyQuestService, FlyQuestService>();
-    services.AddScoped<IBookingService, FlyQuestService>();
     services.AddScoped<ISkyTrailsService, SkyTrailsService>();
-    services.AddScoped<IBookingService, SkyTrailsService>();
     services.AddScoped<BookFlightService>();
-    services.AddScoped<BookingServiceFactory>();
+    services.AddScoped<FlightBookingFactory>();
     services.AddScoped<HttpService>();
     services.AddSwaggerExamplesFromAssemblyOf<Program>();
 }
@@ -102,13 +110,13 @@ void ConfigureApp(WebApplication app)
     app.UseRouting();
 
     // Configure the HTTP request pipeline.
-    if (app.Environment.IsDevelopment())
+    // if (app.Environment.IsDevelopment())
     {
         app.UseSwagger();
         app.UseSwaggerUI(c => { c.SwaggerEndpoint("/swagger/v1/swagger.json", "My API V1"); });
     }
 
-    app.UseHttpsRedirection();
+    // app.UseHttpsRedirection();
 
     app.UseAuthentication();
     app.UseAuthorization();
