@@ -1,9 +1,10 @@
 using DataSourceFlyQuest.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.UseUrls("https://*:10114", "http://*:10115");
 
 // Add services to the container.
-
+builder.Services.AddLogging();
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -20,7 +21,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
