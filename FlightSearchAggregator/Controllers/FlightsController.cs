@@ -9,7 +9,7 @@ using Swashbuckle.AspNetCore.Annotations;
 namespace FlightSearchAggregator.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/flights")]
 public class FlightsController : ControllerBase
 {
     private readonly FlightService _flightService;

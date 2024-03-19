@@ -1,9 +1,12 @@
-﻿using FlightSearchAggregator.Helpers;
+﻿using FlightSearchAggregator.Example;
+using FlightSearchAggregator.Helpers;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
+using Swashbuckle.AspNetCore.Filters;
 
 namespace FlightSearchAggregator.Auth;
 
-[Route("api/[controller]")]
+[Route("api/auth")]
 [ApiController]
 public class AuthController : ControllerBase
 {
@@ -30,6 +33,9 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
+    [SwaggerOperation(Summary = "",
+        Description = "Use the login in the example or register")]
+    [SwaggerRequestExample(typeof(string), typeof(LoginExample))]
     public IActionResult Login([FromBody] LoginModel model)
     {
         _logger.LogInformationWithMethod($"LoginModel: {model}");

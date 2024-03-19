@@ -1,4 +1,5 @@
 ﻿using FlightSearchAggregator.Dtos;
+using FlightSearchAggregator.Example;
 using FlightSearchAggregator.Helpers;
 using FlightSearchAggregator.Models;
 using FlightSearchAggregator.Services.Bookings;
@@ -11,7 +12,7 @@ namespace FlightSearchAggregator.Controllers;
 
 [Authorize]
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/flights/bookings")]
 public class BookingFlightsController : ControllerBase
 {
     private readonly BookFlightService _bookFlightService;
@@ -25,7 +26,8 @@ public class BookingFlightsController : ControllerBase
 
     [HttpGet("{id}")]
     [SwaggerOperation(Summary = "Retrieves booking details by ID",
-        Description = "Provides detailed information about a booking, including passenger details and flight information.")]
+        Description =
+            "Provides detailed information about a booking, including passenger details and flight information.")]
     [SwaggerResponse(StatusCodes.Status200OK, "Booking details retrieved successfully", typeof(BookingDetailDto))]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Booking with the specified ID was not found")]
     public async Task<IActionResult> GetBookingDetail(Guid id)
@@ -42,9 +44,9 @@ public class BookingFlightsController : ControllerBase
 
     [HttpPost]
     [SwaggerOperation(Summary = "Creates a new flight booking",
-        Description = "Submits a booking request for a flight. The request must include passenger details and flight information.")]
+        Description = "Submits a booking request for a flight. The request must include passenger details and flight information. Use example for test")]
     [SwaggerResponse(StatusCodes.Status200OK, "Booking created successfully", typeof(BookingDetailDto))]
-    [SwaggerResponse(StatusCodes.Status404NotFound, "Flight data provider not found")]
+    [SwaggerResponse(StatusCodes.Status404NotFound, "Flight data provider not found or Flight not found")]
     [SwaggerRequestExample(typeof(BookingRequest), typeof(BookingRequestExample))]
     public async Task<IActionResult> BookFlight([FromBody] BookingRequest bookingRequest)
     {
@@ -56,8 +58,13 @@ public class BookingFlightsController : ControllerBase
             return NotFound($"Flight data provider with name: {bookingRequest.DataProvider} not found");
         }
 
-        var bookingDetail = await _bookFlightService.BookFlight(bookingRequest, dataProvider);
+        var flight = await _bookFlightService.GetFlight(bookingRequest.FlightId, dataProvider);
+        if (flight == null)
+        {
+            return NotFound($"Flight with id: {bookingRequest.FlightId} not found");
+        }
 
+        var bookingDetail = await _bookFlightService.BookFlight(bookingRequest, dataProvider);
         return Ok(bookingDetail);
     }
 }
